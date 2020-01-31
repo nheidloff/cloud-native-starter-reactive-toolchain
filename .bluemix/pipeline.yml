@@ -61,7 +61,7 @@ stages:
     type: text
   inputs:
   - type: job
-    stage: BUILD
+    stage: PREPARE
     job: Fetch code
   triggers:
   - type: stage
