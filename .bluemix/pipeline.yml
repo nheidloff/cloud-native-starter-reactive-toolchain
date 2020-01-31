@@ -66,11 +66,6 @@ stages:
   triggers:
   - type: stage
   jobs:
-  - name: Check dockerfile
-    type: tester
-    script: |-
-      #!/bin/bash
-      
   - name: Check registry
     type: builder
     build_type: cr
@@ -127,6 +122,7 @@ stages:
   jobs:
   - name: Deploy to Kubernetes
     type: deployer
+    build_type: kubernetes
     target:
       region_id: ${PROD_REGION_ID}
       api_key: ${API_KEY}
