@@ -1,0 +1,135 @@
+---
+defaultBaseImageVersion: latest
+properties:
+- name: IBM_CLOUD_API_KEY
+  value: ${API_KEY}
+  type: secure
+stages:
+- name: PREPARE
+  inputs:
+  - type: git
+    branch: master
+    service: ${GIT_REPO}    
+  triggers:
+  - type: commit
+  properties:
+  - name: IMAGE_NAME
+    value: ${APP_NAME}
+    type: text
+  jobs:
+  - name: Fetch code
+    type: builder
+    artifact_dir: ''
+    build_type: shell
+    script: |+
+      #!/bin/bash
+      # set -x
+
+      # Git repo cloned at $WORKING_DIR, copy into $ARCHIVE_DIR
+      mkdir -p $ARCHIVE_DIR
+      cp -R -n ./ $ARCHIVE_DIR/ || true
+
+      # Record git info
+      echo "GIT_URL=${GIT_URL}" >> $ARCHIVE_DIR/build.properties
+      echo "GIT_BRANCH=${GIT_BRANCH}" >> $ARCHIVE_DIR/build.properties
+      echo "GIT_COMMIT=${GIT_COMMIT}" >> $ARCHIVE_DIR/build.properties
+      echo "SOURCE_BUILD_NUMBER=${BUILD_NUMBER}" >> $ARCHIVE_DIR/build.properties
+      cat $ARCHIVE_DIR/build.properties
+  - name: Deploy Prereqs
+    type: deployer
+    build_type: kubernetes
+    script: |-
+      #!/bin/bash
+      curl -L https://github.com/strimzi/strimzi-kafka-operator/releases/download/0.15.0/strimzi-cluster-operator-0.15.0.yaml \
+        | sed 's/namespace: .*/namespace: kafka/' \
+        | kubectl apply -f - -n kafka 
+      cd reactive
+      kubectl apply -f /scripts/kafka-cluster.yaml -n kafka 
+- name: CONTAINERIZE
+  properties:
+  - name: buildprops
+    value: build.properties
+    type: file
+  - name: DOCKER_ROOT
+    value: .
+    type: text
+  - name: DOCKER_FILE
+    value: Dockerfile
+    type: text
+  - name: PIPELINE_IMAGE_URL
+    value: undefined
+    type: text
+  inputs:
+  - type: job
+    stage: BUILD
+    job: Fetch code
+  triggers:
+  - type: stage
+  jobs:
+  - name: Check dockerfile
+    type: tester
+    script: |-
+      #!/bin/bash
+      
+  - name: Check registry
+    type: builder
+    build_type: cr
+    artifact_dir: ''
+    target:
+      region_id: ${REGISTRY_REGION_ID}
+      api_key: ${API_KEY}
+    namespace: ${REGISTRY_NAMESPACE}
+    image_name: ${APP_NAME}
+    script: |-
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      # copy the script below into your app code repo (e.g. ./scripts/check_registry.sh) and 'source' it from your pipeline job
+      #    source ./scripts/check_registry.sh
+      # alternatively, you can source it from online script:
+      #    source <(curl -sSL "https://raw.githubusercontent.com/open-toolchain/commons/master/scripts/check_registry.sh")
+      # ------------------
+      # source: https://raw.githubusercontent.com/open-toolchain/commons/master/scripts/check_registry.sh
+
+      # This script checks presence of registry namespace.
+      source <(curl -sSL "https://raw.githubusercontent.com/open-toolchain/commons/master/scripts/check_registry.sh")
+  - name: Build container image
+    type: builder
+    build_type: cr
+    artifact_dir: output
+    target:
+      region_id: ${REGISTRY_REGION_ID}
+      api_key: ${API_KEY}
+    namespace: ${REGISTRY_NAMESPACE}
+    image_name: ${APP_NAME}
+    script: |
+      #!/bin/bash
+- name: DEPLOY
+  inputs:
+  - type: job
+    stage: CONTAINERIZE
+    job: Build container image
+  triggers:
+  - type: stage
+  properties:
+  - name: buildprops
+    value: build.properties
+    type: file
+  - name: CLUSTER_NAMESPACE
+    value: ${PROD_CLUSTER_NAMESPACE}
+    type: text
+  - name: DEPLOYMENT_FILE
+    value: deployment.yml
+    type: text
+  - name: APP_URL
+    value: undefined
+    type: text  
+  jobs:
+  - name: Deploy to Kubernetes
+    type: deployer
+    target:
+      region_id: ${PROD_REGION_ID}
+      api_key: ${API_KEY}
+      kubernetes_cluster: ${PROD_CLUSTER_NAME}
+    script: |
+      #!/bin/bash
