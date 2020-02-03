@@ -41,13 +41,13 @@
         echo "GIT_COMMIT=${GIT_COMMIT}" >> $ARCHIVE_DIR/build.properties
         echo "SOURCE_BUILD_NUMBER=${BUILD_NUMBER}" >> $ARCHIVE_DIR/build.properties
         cat $ARCHIVE_DIR/build.properties
-  - name: CONTAINERIZE
+  - name: DEPLOY_PREREQS
     properties:
     - name: buildprops
       value: build.properties
       type: file
     - name: DOCKER_ROOT
-      value: 2-deploying-to-openshift
+      value: .
       type: text
     - name: DOCKER_FILE
       value: Dockerfile
@@ -62,7 +62,7 @@
     triggers:
     - type: stage
     jobs:
-    - name: Build on OpenShift
+    - name: Deploy Kafka
       type: deployer
       build_type: kubernetes
       target:
@@ -71,12 +71,22 @@
         kubernetes_cluster: ${PROD_CLUSTER_NAME}
       script: |-
         #!/bin/bash
-        echo end
+        kubectl create namespace kafka || true
         curl -L https://github.com/strimzi/strimzi-kafka-operator/releases/download/0.15.0/strimzi-cluster-operator-0.15.0.yaml \
           | sed 's/namespace: .*/namespace: kafka/' \
-          | kubectl apply -f - -n kafka 
+          | kubectl apply -f - -n kafka || true
         cd reactive
-        kubectl apply -f /scripts/kafka-cluster.yaml -n kafka 
+        kubectl apply -f /scripts/kafka-cluster.yaml -n kafka || true
+    - name: Deploy Kafka
+      type: deployer
+      build_type: kubernetes
+      target:
+        region_id: ${PROD_REGION_ID}
+        api_key: ${API_KEY}
+        kubernetes_cluster: ${PROD_CLUSTER_NAME}
+      script: |-
+        #!/bin/bash
+        echo start
   - name: DEPLOY
     properties:
     - name: buildprops
