@@ -109,7 +109,7 @@
     triggers:
     - type: stage
     jobs:
-    - name: Build articles
+    - name: Build images
       type: builder
       build_type: cr
       artifact_dir: .
@@ -127,11 +127,25 @@
         cd ${root_folder}/reactive/articles-reactive/src/main/resources
         sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties.temp
         sed "s/IN_MEMORY_STORE/no/g" application.properties.temp > application.properties.temp2
-        sed "s/POSTGRES_URL/database-articles.my-postgresql-operator-dev4devs-com:5432/g" application.properties.temp2 > application.properties
-        
+        sed "s/POSTGRES_URL/database-articles.my-postgresql-operator-dev4devs-com:5432/g" application.properties.temp2 > application.properties        
         cd ${root_folder}/reactive/articles-reactive/
         ibmcloud cr build -f ${root_folder}/reactive/articles-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest .
-    - name: Deploy articles
+
+        cd ${root_folder}/authors-nodejs/
+        ibmcloud cr build -f ${root_folder}/authors-nodejs/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/authors:1 .
+
+        cd ${root_folder}/reactive/web-api-reactive/src/main/resources
+        sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties        
+        cd ${root_folder}/reactive/web-api-reactive/
+        ibmcloud cr build -f ${root_folder}/reactive/web-api-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/web-api-reactive:latest .
+
+        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
+        nodeport=$(kubectl get svc web-api-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
+        cd ${root_folder}/reactive/web-app-reactive/src
+        sed "s/endpoint-api-ip:ingress-np/${clusterip}:${nodeport}/g" store.js.template > store.js        
+        cd ${root_folder}/reactive/web-app-reactive/
+        ibmcloud cr build -f ${root_folder}/reactive/web-app-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/web-app-reactive:latest .
+    - name: Deploy services
       type: deployer
       build_type: kubernetes
       target:
@@ -142,151 +156,33 @@
         #!/bin/bash
         cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd) 
+        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
 
         kubectl delete -f ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml --ignore-not-found || true
-
         sed "s+articles-reactive:latest+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml         
         kubectl apply -f ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml 
-      
-        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
         nodeport=$(kubectl get svc articles-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
         echo API Explorer: http://${clusterip}:${nodeport}/explorer
-    - name: Build authors
-      type: builder
-      build_type: cr
-      artifact_dir: .
-      target:
-        region_id: ${REGISTRY_REGION_ID}
-        api_key: ${API_KEY}
-      namespace: ${REGISTRY_NAMESPACE}
-      image_name: ${APP_NAME}
-      script: |
-        #!/bin/bash    
-        cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd)
-        MY_REGISTRY_URL=${REGISTRY_URL}
-        
-        cd ${root_folder}/authors-nodejs/
-        ibmcloud cr build -f ${root_folder}/authors-nodejs/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/authors:1 .
-    - name: Deploy authors
-      type: deployer
-      build_type: kubernetes
-      target:
-        region_id: ${PROD_REGION_ID}
-        api_key: ${API_KEY}
-        kubernetes_cluster: ${PROD_CLUSTER_NAME}
-      script: |+
-        #!/bin/bash
-        cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd) 
 
         kubectl delete -f ${root_folder}/authors-nodejs/deployment/deployment.yaml.template --ignore-not-found || true
-
         sed -e "s|<URL>|notused|g" -e "s|<DB>|local|g" ${root_folder}/authors-nodejs/deployment/deployment.yaml.template > ${root_folder}/authors-nodejs/deployment/temp-deployment.yaml
         sed "s+authors:1+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/authors:1+g" ${root_folder}/authors-nodejs/deployment/temp-deployment.yaml > ${root_folder}/authors-nodejs/deployment/IKS-kubernetes.yaml
         kubectl apply -f ${root_folder}/authors-nodejs/deployment/IKS-kubernetes.yaml
       
-        nodeport=$(kubectl get svc authors --ignore-not-found --output 'jsonpath={.spec.ports[*].nodePort}')
-        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
-    - name: Build web-api
-      type: builder
-      build_type: cr
-      artifact_dir: .
-      target:
-        region_id: ${REGISTRY_REGION_ID}
-        api_key: ${API_KEY}
-      namespace: ${REGISTRY_NAMESPACE}
-      image_name: ${APP_NAME}
-      script: |
-        #!/bin/bash    
-        cd web-api-reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd)
-        MY_REGISTRY_URL=${REGISTRY_URL}
-
-        cd ${root_folder}/reactive/web-api-reactive/src/main/resources
-        sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties
-        
-        cd ${root_folder}/reactive/web-api-reactive/
-        ibmcloud cr build -f ${root_folder}/reactive/web-api-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/web-api-reactive:latest .
-    - name: Deploy web-api
-      type: deployer
-      build_type: kubernetes
-      target:
-        region_id: ${PROD_REGION_ID}
-        api_key: ${API_KEY}
-        kubernetes_cluster: ${PROD_CLUSTER_NAME}
-      script: |+
-        #!/bin/bash
-        cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd) 
-
         kubectl delete -f ${root_folder}/reactive/web-api-reactive/deployment/kubernetes.yaml --ignore-not-found || true
-
         sed "s+web-api-reactive:latest+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/web-api-reactive:latest+g" ${root_folder}/reactive/web-api-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/web-api-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/web-api-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/web-api-reactive/deployment/IKS-kubernetes.yaml         
-        kubectl apply -f ${root_folder}/reactive/web-api-reactive/deployment/IKS-kubernetes.yaml 
-      
-        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
+        kubectl apply -f ${root_folder}/reactive/web-api-reactive/deployment/IKS-kubernetes.yaml               
         nodeport=$(kubectl get svc web-api-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
         echo API Explorer: http://${clusterip}:${nodeport}/explorer
-    - name: Build web-app
-      type: builder
-      build_type: cr
-      artifact_dir: .
-      target:
-        region_id: ${REGISTRY_REGION_ID}
-        api_key: ${API_KEY}
-      namespace: ${REGISTRY_NAMESPACE}
-      image_name: ${APP_NAME}
-      script: |
-        #!/bin/bash    
-        cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd)
-        MY_REGISTRY_URL=${REGISTRY_URL}
-
-        clusterip=$(ibmcloud ks workers --cluster $CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
-        nodeport=$(kubectl get svc web-api-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
-
-        cd ${root_folder}/reactive/web-app-reactive/src
-        sed "s/endpoint-api-ip:ingress-np/${clusterip}:${nodeport}/g" store.js.template > store.js
-        
-        cd ${root_folder}/reactive/web-app-reactive/
-        ibmcloud cr build -f ${root_folder}/reactive/web-app-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/web-app-reactive:latest .
-    - name: Deploy web-app
-      type: deployer
-      build_type: kubernetes
-      target:
-        region_id: ${PROD_REGION_ID}
-        api_key: ${API_KEY}
-        kubernetes_cluster: ${PROD_CLUSTER_NAME}
-      script: |+
-        #!/bin/bash
-        cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd) 
 
         kubectl delete -f ${root_folder}/reactive/web-app-reactive/deployment/kubernetes.yaml --ignore-not-found || true
-
         sed "s+web-app-reactive:latest+$REGISTRY/$REGISTRY_NAMESPACE/web-app-reactive:latest+g" ${root_folder}/reactive(web-app-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml 
-        kubectl apply -f ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml 
-
-        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
+        kubectl apply -f ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml         
         nodeport=$(kubectl get svc web-app-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
         echo Open the app: http://${clusterip}:${nodeport}/
-    - name: Show URLs
-      type: deployer
-      build_type: kubernetes
-      target:
-        region_id: ${PROD_REGION_ID}
-        api_key: ${API_KEY}
-        kubernetes_cluster: ${PROD_CLUSTER_NAME}
-      script: |+
-        #!/bin/bash
-        cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd) 
-
-        clusterip=$(ibmcloud ks workers --cluster $CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
 
         echo ------------------------------------------------------------------------------------
         echo Kafka Strimzi operator
