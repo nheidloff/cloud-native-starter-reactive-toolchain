@@ -30,7 +30,7 @@ services:
     parameters:
       repo_name: 'cloud-native-starter-reactive-{{timestamp}}'
       repo_url: 'https://github.com/IBM/cloud-native-starter'
-      type: 'link'
+      type: 'clone'
       has_issues: false
       enable_traceability: true
       private_repo: false

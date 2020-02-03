@@ -76,8 +76,8 @@
           | sed 's/namespace: .*/namespace: kafka/' \
           | kubectl apply -f - -n kafka || true
         cd reactive
-        kubectl apply -f /scripts/kafka-cluster.yaml -n kafka || true
-    - name: Deploy Kafka
+        kubectl apply -f scripts/kafka-cluster.yaml -n kafka || true
+    - name: Deploy Postgres
       type: deployer
       build_type: kubernetes
       target:
@@ -86,8 +86,10 @@
         kubernetes_cluster: ${PROD_CLUSTER_NAME}
       script: |-
         #!/bin/bash
-        echo start
-  - name: DEPLOY
+        kubectl create ns my-postgresql-operator-dev4devs-com || true
+        cd reactive
+        kubectl create -f iks-scripts/postgres.yaml || true
+  - name: DEPLOY_SERVICES
     properties:
     - name: buildprops
       value: build.properties
@@ -99,7 +101,33 @@
     triggers:
     - type: stage
     jobs:
-    - name: Deploy to OpenShift
+    - name: Build articles image
+      type: builder
+      build_type: cr
+      artifact_dir: output
+      target:
+        region_id: ${REGISTRY_REGION_ID}
+        api_key: ${API_KEY}
+      namespace: ${REGISTRY_NAMESPACE}
+      image_name: ${APP_NAME}
+      script: |
+        #!/bin/bash    
+        cd reactive
+        root_folder=$(cd $(dirname $0); cd ..; pwd) 
+
+        # articles-reative
+        cd ${root_folder}/reactive/articles-reactive
+        kubectl delete -f deployment/kubernetes.yaml --ignore-not-found
+        cd ${root_folder}/reactive/articles-reactive/src/main/resources
+        sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties.temp
+        sed "s/IN_MEMORY_STORE/no/g" application.properties.temp > application.properties.temp2
+        sed "s/POSTGRES_URL/database-articles.my-postgresql-operator-dev4devs-com:5432/g" application.properties.temp2 > application.properties
+
+        echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
+        echo "REGISTRY_URL=${REGISTRY_URL}"
+        
+        ibmcloud cr build -f ${root_folder}/reactive/articles-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest .
+    - name: Deploy articles
       type: deployer
       build_type: kubernetes
       target:
@@ -107,6 +135,15 @@
         api_key: ${API_KEY}
         kubernetes_cluster: ${PROD_CLUSTER_NAME}
       script: |+
-        #!/bin/bash  
-        echo end
+        #!/bin/bash
+        cd reactive
+        root_folder=$(cd $(dirname $0); cd ..; pwd) 
 
+        cd ${root_folder}/reactive/articles-reactive/src/main/resources
+        sed "s+articles-reactive:latest+$REGISTRY_REGION_ID/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/articles-reactive/deployment/temp-kubernetes.yaml 
+        sed "s+Never+Always+g" ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml         
+        kubectl apply -f ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml 
+      
+        clusterip=$(ibmcloud ks workers --cluster $CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
+        nodeport=$(kubectl get svc articles-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
+        _out API Explorer: http://${clusterip}:${nodeport}/explorer
