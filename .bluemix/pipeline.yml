@@ -218,7 +218,7 @@
         kubernetes_cluster: ${PROD_CLUSTER_NAME}
       script: |+
         #!/bin/bash
-        cd web-api-reactive
+        cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd) 
 
         kubectl delete -f ${root_folder}/reactive/web-api-reactive/deployment/kubernetes.yaml --ignore-not-found || true
@@ -241,7 +241,7 @@
       image_name: ${APP_NAME}
       script: |
         #!/bin/bash    
-        cd web-app-reactive
+        cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd)
         MY_REGISTRY_URL=${REGISTRY_URL}
 
@@ -262,7 +262,7 @@
         kubernetes_cluster: ${PROD_CLUSTER_NAME}
       script: |+
         #!/bin/bash
-        cd web-app-reactive
+        cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd) 
 
         kubectl delete -f ${root_folder}/reactive/web-app-reactive/deployment/kubernetes.yaml --ignore-not-found || true
@@ -274,7 +274,7 @@
         clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
         nodeport=$(kubectl get svc web-app-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
         echo Open the app: http://${clusterip}:${nodeport}/
-    - name: Deploy web-app
+    - name: Show URLs
       type: deployer
       build_type: kubernetes
       target:
@@ -283,7 +283,7 @@
         kubernetes_cluster: ${PROD_CLUSTER_NAME}
       script: |+
         #!/bin/bash
-        cd web-app-reactive
+        cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd) 
 
         clusterip=$(ibmcloud ks workers --cluster $CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
