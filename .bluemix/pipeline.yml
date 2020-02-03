@@ -110,7 +110,7 @@
     - name: Build articles
       type: builder
       build_type: cr
-      artifact_dir: output
+      artifact_dir: .
       target:
         region_id: ${REGISTRY_REGION_ID}
         api_key: ${API_KEY}
@@ -158,6 +158,6 @@
         sed "s+Never+Always+g" ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml         
         kubectl apply -f ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml 
       
-        clusterip=$(ibmcloud ks workers --cluster $CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
+        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
         nodeport=$(kubectl get svc articles-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
-        _out API Explorer: http://${clusterip}:${nodeport}/explorer
+        echo API Explorer: http://${clusterip}:${nodeport}/explorer
