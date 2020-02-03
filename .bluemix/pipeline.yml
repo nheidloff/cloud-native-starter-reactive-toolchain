@@ -94,6 +94,12 @@
     - name: buildprops
       value: build.properties
       type: file
+    - name: REGISTRY_URL
+      value: ${REGISTRY_URL}
+      type: text
+    - name: REGISTRY_NAMESPACE
+      value: ${REGISTRY_NAMESPACE}
+      type: text
     inputs:
     - type: job
       stage: FETCH
@@ -101,7 +107,7 @@
     triggers:
     - type: stage
     jobs:
-    - name: Build articles image
+    - name: Build articles
       type: builder
       build_type: cr
       artifact_dir: output
@@ -113,11 +119,10 @@
       script: |
         #!/bin/bash    
         cd reactive
-        root_folder=$(cd $(dirname $0); cd ..; pwd) 
+        root_folder=$(cd $(dirname $0); cd ..; pwd)
+        echo "root_folder=${root_folder}" 
 
         # articles-reative
-        cd ${root_folder}/reactive/articles-reactive
-        kubectl delete -f deployment/kubernetes.yaml --ignore-not-found
         cd ${root_folder}/reactive/articles-reactive/src/main/resources
         sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties.temp
         sed "s/IN_MEMORY_STORE/no/g" application.properties.temp > application.properties.temp2
@@ -126,6 +131,7 @@
         echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
         echo "REGISTRY_URL=${REGISTRY_URL}"
         
+        cd ${root_folder}/reactive/articles-reactive/
         ibmcloud cr build -f ${root_folder}/reactive/articles-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest .
     - name: Deploy articles
       type: deployer
@@ -138,9 +144,16 @@
         #!/bin/bash
         cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd) 
+        echo "root_folder=${root_folder}" 
+
+        cd ${root_folder}/reactive/articles-reactive
+        kubectl delete -f ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml --ignore-not-found
+
+        echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
+        echo "REGISTRY_URL=${REGISTRY_URL}"
 
         cd ${root_folder}/reactive/articles-reactive/src/main/resources
-        sed "s+articles-reactive:latest+$REGISTRY_REGION_ID/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/articles-reactive/deployment/temp-kubernetes.yaml 
+        sed "s+articles-reactive:latest+$REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml         
         kubectl apply -f ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml 
       
