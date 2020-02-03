@@ -94,7 +94,7 @@
     - name: buildprops
       value: build.properties
       type: file
-    - name: REGISTRY_URL
+    - name: MY_REGISTRY_URL
       value: ${REGISTRY_URL}
       type: text
     - name: REGISTRY_NAMESPACE
@@ -130,6 +130,7 @@
 
         echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
         echo "REGISTRY_URL=${REGISTRY_URL}"
+        MY_REGISTRY_URL=${REGISTRY_URL}
         
         cd ${root_folder}/reactive/articles-reactive/
         ibmcloud cr build -f ${root_folder}/reactive/articles-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest .
@@ -150,7 +151,7 @@
         kubectl delete -f ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml --ignore-not-found
 
         echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
-        echo "REGISTRY_URL=${REGISTRY_URL}"
+        echo "MY_REGISTRY_URL=${MY_REGISTRY_URL}"
 
         cd ${root_folder}/reactive/articles-reactive/src/main/resources
         sed "s+articles-reactive:latest+$REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml 
