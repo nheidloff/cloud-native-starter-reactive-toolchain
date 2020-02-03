@@ -120,17 +120,12 @@
         #!/bin/bash    
         cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd)
-        echo "root_folder=${root_folder}" 
+        MY_REGISTRY_URL=${REGISTRY_URL}
 
-        # articles-reative
         cd ${root_folder}/reactive/articles-reactive/src/main/resources
         sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties.temp
         sed "s/IN_MEMORY_STORE/no/g" application.properties.temp > application.properties.temp2
         sed "s/POSTGRES_URL/database-articles.my-postgresql-operator-dev4devs-com:5432/g" application.properties.temp2 > application.properties
-
-        echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
-        echo "REGISTRY_URL=${REGISTRY_URL}"
-        MY_REGISTRY_URL=${REGISTRY_URL}
         
         cd ${root_folder}/reactive/articles-reactive/
         ibmcloud cr build -f ${root_folder}/reactive/articles-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest .
@@ -145,19 +140,52 @@
         #!/bin/bash
         cd reactive
         root_folder=$(cd $(dirname $0); cd ..; pwd) 
-        echo "root_folder=${root_folder}" 
 
-        cd ${root_folder}/reactive/articles-reactive
         kubectl delete -f ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml --ignore-not-found
 
-        echo "REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}"
-        echo "MY_REGISTRY_URL=${MY_REGISTRY_URL}"
-
-        cd ${root_folder}/reactive/articles-reactive/src/main/resources
-        sed "s+articles-reactive:latest+$REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml 
+        sed "s+articles-reactive:latest+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/articles-reactive:latest+g" ${root_folder}/reactive/articles-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/articles-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml         
         kubectl apply -f ${root_folder}/reactive/articles-reactive/deployment/IKS-kubernetes.yaml 
       
         clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}') 
         nodeport=$(kubectl get svc articles-reactive --output 'jsonpath={.spec.ports[*].nodePort}')
         echo API Explorer: http://${clusterip}:${nodeport}/explorer
+    - name: Build authors
+      type: builder
+      build_type: cr
+      artifact_dir: .
+      target:
+        region_id: ${REGISTRY_REGION_ID}
+        api_key: ${API_KEY}
+      namespace: ${REGISTRY_NAMESPACE}
+      image_name: ${APP_NAME}
+      script: |
+        #!/bin/bash    
+        cd reactive
+        root_folder=$(cd $(dirname $0); cd ..; pwd)
+        MY_REGISTRY_URL=${REGISTRY_URL}
+        
+        cd ${root_folder}/authors-nodejs/
+        ibmcloud cr build -f ${root_folder}/authors-nodejs/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/authors:1 .
+    - name: Deploy authors
+      type: deployer
+      build_type: kubernetes
+      target:
+        region_id: ${PROD_REGION_ID}
+        api_key: ${API_KEY}
+        kubernetes_cluster: ${PROD_CLUSTER_NAME}
+      script: |+
+        #!/bin/bash
+        cd reactive
+        root_folder=$(cd $(dirname $0); cd ..; pwd) 
+
+        kubectl delete -f ${root_folder}/authors-nodejs/deployment/IKS-kubernetes.yaml --ignore-not-found
+
+        sed -e "s|<URL>|notused|g" -e "s|<DB>|local|g" ${root_folder}/authors-nodejs/deployment/deployment.yaml.template > ${root_folder}/authors-nodejs/deployment/temp-deployment.yaml
+        sed "s+authors:1+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/authors:1+g" ${root_folder}/authors-nodejs/deployment/temp-deployment.yaml > ${root_folder}/authors-nodejs/deployment/IKS-kubernetes.yaml
+        kubectl apply -f ${root_folder}/authors-nodejs/deployment/IKS-kubernetes.yaml
+      
+        nodeport=$(kubectl get svc authors --ignore-not-found --output 'jsonpath={.spec.ports[*].nodePort}')
+        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
+        echo Sample API call: \"curl 'http://${clusterip}:${nodeport}/api/v1/getauthor?name=Niklas%20Heidloff'\"
+  
