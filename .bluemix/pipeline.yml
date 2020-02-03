@@ -112,7 +112,7 @@
     triggers:
     - type: stage
     jobs:
-    - name: Build images
+    - name: Build services
       type: builder
       build_type: cr
       artifact_dir: .
@@ -188,7 +188,7 @@
         root_folder=$(cd $(dirname $0); cd ..; pwd)
         MY_REGISTRY_URL=${REGISTRY_URL}
 
-        clusterip=$(ibmcloud ks workers --cluster $CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
+        clusterip=$(ibmcloud ks workers --cluster $PROD_CLUSTER_NAME | awk '/Ready/ {print $2;exit;}')
         
         cd ${root_folder}/reactive/web-app-reactive/src
         sed "s/endpoint-api-ip:ingress-np/${clusterip}:${WEB_API_PORT}/g" store.js.template > store.js
@@ -209,7 +209,7 @@
 
         kubectl delete -f ${root_folder}/reactive/web-app-reactive/deployment/kubernetes.yaml --ignore-not-found || true
 
-        sed "s+web-app-reactive:latest+$REGISTRY/$REGISTRY_NAMESPACE/web-app-reactive:latest+g" ${root_folder}/reactive(web-app-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml 
+        sed "s+web-app-reactive:latest+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/web-app-reactive:latest+g" ${root_folder}/reactive(web-app-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml 
         kubectl apply -f ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml 
 
