@@ -66,7 +66,7 @@ On the Delivery Pipeline tab create a new API key or refer to an existing one:
 
 When creating a new key, simply click the 'OK' button:
 
-<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step1b-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step2b-new.png" /></kbd>
 
 ### Step 3
 
