@@ -209,7 +209,7 @@
 
         kubectl delete -f ${root_folder}/reactive/web-app-reactive/deployment/kubernetes.yaml --ignore-not-found || true
 
-        sed "s+web-app-reactive:latest+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/web-app-reactive:latest+g" ${root_folder}/reactive(web-app-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml 
+        sed "s+web-app-reactive:latest+$MY_REGISTRY_URL/$REGISTRY_NAMESPACE/web-app-reactive:latest+g" ${root_folder}/reactive/web-app-reactive/deployment/kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml 
         sed "s+Never+Always+g" ${root_folder}/reactive/web-app-reactive/deployment/temp-kubernetes.yaml > ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml 
         kubectl apply -f ${root_folder}/reactive/web-app-reactive/deployment/IKS-kubernetes.yaml 
 
