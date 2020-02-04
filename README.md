@@ -48,31 +48,31 @@ After clicking the button above, the following page will be opened.
 
 If this is your first time you use this functionality, you need to grant the toolchain access to your GitHub account. In this case click the 'Authorize' button:
 
-<kbd><img src="documentation/step1a-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step1a-new.png" /></kbd>
 
 Grant IBM-Cloud access:
 
-<kbd><img src="documentation/step1b-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step1b-new.png" /></kbd>
 
 After this the GitHub integration will be valid:
 
-<kbd><img src="documentation/step1c-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step1c-new.png" /></kbd>
 
 ### Step 2
 
 On the Delivery Pipeline tab create a new API key or refer to an existing one:
 
-<kbd><img src="documentation/step2a-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step2a-new.png" /></kbd>
 
 When creating a new key, simply click the 'OK' button:
 
-<kbd><img src="documentation/step2b-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step1b-new.png" /></kbd>
 
 ### Step 3
 
 After the key has been defined, your Kubernetes cluster will be displayed in the combobox:
 
-<kbd><img src="documentation/step3-new.png" /></kbd>
+<kbd><img src="https://raw.githubusercontent.com/nheidloff/cloud-native-starter-reactive-toolchain/master/documentation/Step3-new.png" /></kbd>
 
 After this click the 'Create' button in the upper right corner:
 
