@@ -138,7 +138,10 @@
         ibmcloud cr build -f ${root_folder}/authors-nodejs/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/authors:1 .
 
         cd ${root_folder}/reactive/web-api-reactive/src/main/resources
-        sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties        
+        sed "s/KAFKA_BOOTSTRAP_SERVERS/my-cluster-kafka-external-bootstrap.kafka:9094/g" application.properties.template > application.properties.tmp
+        sed "s/CNS_ARTICLES_PORT/8080/g" application.properties.tmp > application.properties.tmp2
+        sed "s/CNS_AUTHORS_PORT/3000/g" application.properties.tmp2 > application.properties.tmp3
+        sed "s/CNS_LOCAL/false/g" application.properties.tmp3 > application.properties
         cd ${root_folder}/reactive/web-api-reactive/
         ibmcloud cr build -f ${root_folder}/reactive/web-api-reactive/Dockerfile --tag $REGISTRY_URL/$REGISTRY_NAMESPACE/web-api-reactive:latest .
     - name: Deploy services
